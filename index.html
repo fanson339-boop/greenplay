@@ -1,1 +1,555 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>GREEN PLAY</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(circle at 20% 10%, #0d4d2a 0%, #052e18 40%, #021a0e 100%);
+    color: #e8ffe8; min-height: 100vh; overflow-x: hidden;
+    background-attachment: fixed;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .08;
+    background-image:
+      radial-gradient(circle at 10% 20%, #7dffb0 1px, transparent 2px),
+      radial-gradient(circle at 80% 40%, #7dffb0 1px, transparent 2px),
+      radial-gradient(circle at 40% 80%, #7dffb0 1px, transparent 2px),
+      radial-gradient(circle at 90% 90%, #7dffb0 1px, transparent 2px);
+    background-size: 120px 120px;
+  }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; position: sticky; top: 0; z-index: 10;
+    background: rgba(3,25,15,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(125,255,176,.15);
+  }
+  .logo { font-weight: 800; letter-spacing: 1px; color: #7dffb0; font-size: 18px; }
+  .balance-box {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(125,255,176,.12); border: 1px solid rgba(125,255,176,.3);
+    padding: 6px 10px; border-radius: 20px; font-weight: 700;
+  }
+  .balance-box .plus {
+    background: #7dffb0; color: #052e18; border-radius: 50%;
+    width: 22px; height: 22px; display: grid; place-items: center;
+    font-weight: 900; cursor: pointer; user-select: none;
+  }
+  .screen { padding: 20px 16px 40px; animation: fadeIn .35s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+  .menu-title { font-size: 26px; font-weight: 800; margin: 10px 0 4px; color: #b6ffcd; }
+  .menu-sub { color: #7abf95; margin-bottom: 22px; font-size: 14px; }
+  .games { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .game-card {
+    background: linear-gradient(160deg, rgba(125,255,176,.14), rgba(0,80,40,.35));
+    border: 1px solid rgba(125,255,176,.25); border-radius: 18px;
+    padding: 22px 14px; text-align: center; cursor: pointer;
+    transition: transform .15s, box-shadow .2s;
+    box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  }
+  .game-card:active { transform: scale(.96); }
+  .game-card .ico { font-size: 40px; display: block; margin-bottom: 8px; }
+  .game-card .name { font-weight: 700; font-size: 16px; }
+  .game-card .desc { font-size: 11px; color: #7abf95; margin-top: 4px; }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px;
+    background: rgba(125,255,176,.1); border: 1px solid rgba(125,255,176,.25);
+    padding: 8px 14px; border-radius: 12px; cursor: pointer; color: #b6ffcd;
+    font-weight: 600; font-size: 14px;
+  }
+  h2 { font-size: 22px; margin: 4px 0 16px; color: #b6ffcd; }
+  .input-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  input[type=number], input[type=text] {
+    flex: 1; background: rgba(0,0,0,.35); border: 1px solid rgba(125,255,176,.25);
+    color: #e8ffe8; padding: 12px; border-radius: 12px; font-size: 16px;
+    outline: none; width: 100%;
+  }
+  input:focus { border-color: #7dffb0; }
+  button.main {
+    background: linear-gradient(135deg, #7dffb0, #2ecc71);
+    color: #052e18; border: none; padding: 14px; border-radius: 12px;
+    font-weight: 800; font-size: 16px; width: 100%; cursor: pointer;
+    box-shadow: 0 6px 16px rgba(46,204,113,.35);
+  }
+  button.main:active { transform: scale(.97); }
+  button.main:disabled { opacity: .5; }
+  .mines-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 16px 0;
+  }
+  .cell {
+    aspect-ratio: 1; background: rgba(125,255,176,.08);
+    border: 1px solid rgba(125,255,176,.2); border-radius: 12px;
+    display: grid; place-items: center; font-size: 26px;
+    cursor: pointer; transition: all .2s; user-select: none;
+  }
+  .cell.revealed { background: rgba(46,204,113,.25); border-color: #2ecc71; }
+  .cell.mine { background: rgba(255,60,60,.25); border-color: #ff3c3c; }
+  .cell:active { transform: scale(.92); }
+  .wheel-wrap { display: grid; place-items: center; margin: 16px 0; position: relative; }
+  .wheel-pointer {
+    position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 12px solid transparent;
+    border-right: 12px solid transparent; border-top: 20px solid #7dffb0;
+    z-index: 3; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
+  }
+  .crash-area {
+    position: relative; height: 240px; background: rgba(0,0,0,.3);
+    border: 1px solid rgba(125,255,176,.2); border-radius: 16px;
+    overflow: hidden; margin: 14px 0;
+  }
+  .rocket { position: absolute; left: 20px; bottom: 20px; font-size: 32px; transition: all .1s linear; }
+  .mult-big { font-size: 48px; font-weight: 900; color: #7dffb0; text-align: center; margin: 8px 0; }
+  .history { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .hist-item {
+    padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 700;
+    background: rgba(125,255,176,.12); color: #7dffb0;
+  }
+  .hist-item.high { background: rgba(255,200,0,.2); color: #ffd447; }
+  .case-card {
+    background: linear-gradient(160deg, rgba(125,255,176,.14), rgba(0,80,40,.35));
+    border: 1px solid rgba(125,255,176,.25); border-radius: 18px;
+    padding: 18px; margin-bottom: 14px; cursor: pointer;
+  }
+  .case-card h3 { margin: 0 0 6px; color: #b6ffcd; }
+  .case-card .price { color: #7dffb0; font-weight: 700; font-size: 14px; }
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75);
+    display: grid; place-items: center; z-index: 100; padding: 20px;
+  }
+  .modal-box {
+    background: linear-gradient(160deg, #0a3a22, #052e18);
+    border: 1px solid rgba(125,255,176,.35); border-radius: 18px;
+    padding: 22px; width: 100%; max-width: 340px; text-align: center;
+  }
+  .modal-box h3 { margin: 0 0 12px; color: #b6ffcd; }
+  .big-reward { font-size: 34px; font-weight: 900; color: #ffd447; margin: 12px 0; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.85); border: 1px solid rgba(125,255,176,.4);
+    color: #b6ffcd; padding: 10px 18px; border-radius: 12px;
+    font-size: 14px; z-index: 200; animation: fadeIn .2s;
+  }
+  .loader { text-align: center; color: #7dffb0; padding: 20px; }
+  .spinner {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 3px solid rgba(125,255,176,.2); border-top-color: #7dffb0;
+    animation: spin 1s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
 
+<div class="topbar">
+  <div class="logo">🌿 GREEN PLAY</div>
+  <div class="balance-box">
+    <span id="balance">0</span> ⭐
+    <span class="plus" onclick="openDeposit()">+</span>
+  </div>
+</div>
+
+<div id="app"></div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+tg?.ready();
+tg?.expand();
+
+const USER_ID = tg?.initDataUnsafe?.user?.id || 0;
+const API = "";   // если фронт и бот на одном хосте — оставь пусто.
+                  // Если фронт на GitHub Pages, а бот локальный — сюда вписать публичный URL бота.
+
+let state = { screen: "menu", balance: 0 };
+
+async function api(path, opts = {}) {
+  const url = API + path;
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  return res.json();
+}
+
+async function loadUser() {
+  if (!USER_ID) return;
+  const u = await api("/api/user?user_id=" + USER_ID);
+  if (u.balance !== undefined) state.balance = u.balance;
+  document.getElementById("balance").textContent = (state.balance || 0).toFixed(2);
+}
+
+function toast(t) {
+  const el = document.createElement("div");
+  el.className = "toast"; el.textContent = t;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2200);
+}
+
+function go(screen, extra) {
+  state.screen = screen;
+  render(extra);
+}
+
+function render(extra) {
+  const app = document.getElementById("app");
+  if (state.screen === "menu") app.innerHTML = menuHTML();
+  else if (state.screen === "mines") { app.innerHTML = minesHTML(); if (extra?.game) startMines(extra.game); }
+  else if (state.screen === "upgrade") app.innerHTML = upgradeHTML();
+  else if (state.screen === "crash") { app.innerHTML = crashHTML(); loadCrashHistory(); }
+  else if (state.screen === "cases") app.innerHTML = casesHTML();
+}
+
+// --------- MENU ---------
+function menuHTML() {
+  return `
+  <div class="screen">
+    <div class="menu-title">Игры</div>
+    <div class="menu-sub">Выбери игру и испытай удачу</div>
+    <div class="games">
+      <div class="game-card" onclick="go('mines')">
+        <span class="ico">💣</span>
+        <div class="name">Мины</div>
+        <div class="desc">25 клеток · 7 мин</div>
+      </div>
+      <div class="game-card" onclick="go('upgrade')">
+        <span class="ico">🎡</span>
+        <div class="name">Апгрейд</div>
+        <div class="desc">Колесо удачи</div>
+      </div>
+      <div class="game-card" onclick="go('crash')">
+        <span class="ico">🚀</span>
+        <div class="name">Краш</div>
+        <div class="desc">До 100x</div>
+      </div>
+      <div class="game-card" onclick="go('cases')">
+        <span class="ico">🎁</span>
+        <div class="name">Кейсы</div>
+        <div class="desc">NFT · Звёзды</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// --------- MINES ---------
+let minesState = {};
+
+function minesHTML() {
+  return `
+  <div class="screen">
+    <div class="back-btn" onclick="go('menu')">← Назад</div>
+    <h2>💣 Мины</h2>
+    <div class="input-row">
+      <input type="number" id="minesBet" placeholder="Ставка 10–3500" min="10" max="3500">
+      <button class="main" style="width:auto;padding:12px 18px" onclick="minesBet()">Играть</button>
+    </div>
+    <div class="mines-grid" id="minesGrid"></div>
+    <div id="minesInfo" style="text-align:center;color:#7abf95;font-size:14px"></div>
+    <button class="main" id="minesCashout" style="display:none;margin-top:12px" onclick="minesCashout()">💰 Забрать</button>
+  </div>`;
+}
+
+async function minesBet() {
+  const bet = parseFloat(document.getElementById("minesBet").value);
+  if (!bet || bet < 10 || bet > 3500) return toast("Ставка 10–3500");
+  if (bet > state.balance) return toast("Недостаточно средств");
+  const r = await api("/api/mines/start", {
+    method: "POST", body: JSON.stringify({ user_id: USER_ID, bet })
+  });
+  if (r.error) return toast(r.error);
+  minesState = { bet, mines: r.mines, seq: r.seq, opened: 0, finished: false };
+  const grid = document.getElementById("minesGrid");
+  grid.innerHTML = "";
+  for (let i = 0; i < 25; i++) {
+    const c = document.createElement("div");
+    c.className = "cell"; c.dataset.i = i;
+    c.onclick = () => minesClick(i);
+    grid.appendChild(c);
+  }
+  document.getElementById("minesInfo").textContent = "Открывай клетки. В 7 из 25 — мины.";
+  document.getElementById("minesCashout").style.display = "block";
+  await loadUser();
+}
+
+async function minesClick(i) {
+  if (minesState.finished) return;
+  const cells = document.querySelectorAll(".cell");
+  const cell = cells[i];
+  if (cell.classList.contains("revealed")) return;
+
+  const isMine = minesState.mines.includes(i);
+  if (isMine) {
+    cell.classList.add("mine");
+    cell.textContent = "💣";
+    minesState.finished = true;
+    document.querySelectorAll(".cell").forEach((c, idx) => {
+      if (minesState.mines.includes(idx) && !c.classList.contains("revealed")) {
+        c.classList.add("mine"); c.textContent = "💣";
+      }
+    });
+    document.getElementById("minesCashout").style.display = "none";
+    document.getElementById("minesInfo").textContent = "💥 Мина! Ставка сгорела.";
+    await api("/api/mines/finish", {
+      method: "POST",
+      body: JSON.stringify({ user_id: USER_ID, bet: minesState.bet, won: false, moves: minesState.opened })
+    });
+    await loadUser();
+    return;
+  }
+
+  cell.classList.add("revealed");
+  cell.textContent = "💎";
+  minesState.opened++;
+
+  if (minesState.opened === 5) {
+    return minesCashout(true);
+  }
+}
+
+async function minesCashout(auto = false) {
+  if (minesState.finished || minesState.opened === 0) return;
+  minesState.finished = true;
+  const r = await api("/api/mines/finish", {
+    method: "POST",
+    body: JSON.stringify({ user_id: USER_ID, bet: minesState.bet, won: true, moves: minesState.opened })
+  });
+  toast("💰 Выигрыш: +" + r.gain + " ⭐");
+  document.getElementById("minesCashout").style.display = "none";
+  document.getElementById("minesInfo").textContent = "✅ Забрал " + r.gain + " ⭐ (x" + r.mult + ")";
+  await loadUser();
+}
+
+// --------- UPGRADE ---------
+function upgradeHTML() {
+  return `
+  <div class="screen">
+    <div class="back-btn" onclick="go('menu')">← Назад</div>
+    <h2>🎡 Апгрейд</h2>
+    <div class="input-row">
+      <input type="number" id="upBet" placeholder="Ставка" min="10">
+      <input type="number" id="upChance" placeholder="Шанс 1–95%" min="1" max="95" value="50">
+    </div>
+    <div style="color:#7abf95;font-size:13px;margin-bottom:12px">Чем меньше шанс — тем больше множитель. Множитель ≈ 100 / шанс.</div>
+    <div class="wheel-wrap">
+      <div class="wheel-pointer"></div>
+      <div id="wheelCanvas"></div>
+    </div>
+    <div class="mult-big" id="upMult">x2.00</div>
+    <button class="main" onclick="upgradePlay()">🎯 Крутить</button>
+    <div id="upResult" style="text-align:center;margin-top:12px;font-weight:700"></div>
+  </div>`;
+}
+
+function drawWheel(chance) {
+  const size = 220, r = size / 2;
+  const green = chance / 100;
+  const angle = green * 360;
+  const svg = `
+  <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${r}" cy="${r}" r="${r-4}" fill="#3a3a3a" stroke="#7dffb0" stroke-width="2"/>
+    <path d="M ${r} ${r} L ${r} ${4} A ${r-4} ${r-4} 0 ${angle>180?1:0} 1 ${r + (r-4)*Math.sin(angle*Math.PI/180)} ${r - (r-4)*Math.cos(angle*Math.PI/180)} Z" fill="#2ecc71"/>
+    <circle cx="${r}" cy="${r}" r="16" fill="#052e18" stroke="#7dffb0" stroke-width="2"/>
+  </svg>`;
+  document.getElementById("wheelCanvas").innerHTML = svg;
+}
+
+document.addEventListener("input", (e) => {
+  if (e.target.id === "upChance") {
+    const c = Math.max(1, Math.min(95, parseFloat(e.target.value) || 50));
+    document.getElementById("upMult").textContent = "x" + (100 / c).toFixed(2);
+    drawWheel(c);
+  }
+});
+
+async function upgradePlay() {
+  const bet = parseFloat(document.getElementById("upBet").value);
+  const chance = parseFloat(document.getElementById("upChance").value);
+  if (!bet || bet < 10) return toast("Мин. ставка 10");
+  if (bet > state.balance) return toast("Недостаточно средств");
+  if (!chance || chance < 1 || chance > 95) return toast("Шанс 1–95");
+  const r = await api("/api/upgrade/play", {
+    method: "POST",
+    body: JSON.stringify({ user_id: USER_ID, bet, chance })
+  });
+  if (r.error) return toast(r.error);
+  if (r.won) {
+    document.getElementById("upResult").innerHTML = `<span style="color:#7dffb0">🎉 Победа! +${r.gain} ⭐ (x${r.mult})</span>`;
+    toast("+" + r.gain + " ⭐");
+  } else {
+    document.getElementById("upResult").innerHTML = `<span style="color:#ff6b6b">💀 Проигрыш -${bet} ⭐</span>`;
+  }
+  await loadUser();
+}
+
+setTimeout(() => { if (state.screen === "upgrade") drawWheel(50); }, 100);
+
+// --------- CRASH ---------
+let crashState = { active: false, mult: 1, mult0: 0, bet: 0, timer: null, crashAt: 0 };
+
+function crashHTML() {
+  return `
+  <div class="screen">
+    <div class="back-btn" onclick="go('menu')">← Назад</div>
+    <h2>🚀 Краш</h2>
+    <div class="input-row">
+      <input type="number" id="crashBet" placeholder="Ставка 10–3500" min="10" max="3500">
+    </div>
+    <div class="crash-area" id="crashArea">
+      <div class="rocket" id="rocket">🚀</div>
+      <div style="position:absolute;top:10px;right:12px;font-size:22px;font-weight:900;color:#7dffb0" id="crashMult">1.00x</div>
+    </div>
+    <button class="main" id="crashBtn" onclick="crashToggle()">Старт</button>
+    <h3 style="color:#b6ffcd;font-size:15px;margin-top:20px">Прошлые раунды:</h3>
+    <div class="history" id="crashHist"></div>
+  </div>`;
+}
+
+async function loadCrashHistory() {
+  const r = await api("/api/crash_history");
+  const h = document.getElementById("crashHist");
+  if (!h) return;
+  h.innerHTML = (r.history || []).map(m =>
+    `<div class="hist-item ${m >= 2 ? "high" : ""}">${m.toFixed(2)}x</div>`
+  ).join("");
+}
+
+async function crashToggle() {
+  if (crashState.active) return crashCashout();
+  const bet = parseFloat(document.getElementById("crashBet").value);
+  if (!bet || bet < 10 || bet > 3500) return toast("Ставка 10–3500");
+  if (bet > state.balance) return toast("Недостаточно средств");
+  const r = await api("/api/crash/start", {
+    method: "POST", body: JSON.stringify({ user_id: USER_ID, bet })
+  });
+  if (r.error) return toast(r.error);
+  crashState = { active: true, mult: 1, mult0: 1, bet, crashAt: r.mult, timer: null };
+  document.getElementById("crashBtn").textContent = "💰 Забрать";
+  await loadUser();
+  const rocket = document.getElementById("rocket");
+  const area = document.getElementById("crashArea");
+  const start = Date.now();
+  const duration = Math.min(6000, 500 + (r.mult - 1) * 300);
+  crashState.timer = setInterval(() => {
+    const t = Math.min(1, (Date.now() - start) / duration);
+    crashState.mult = 1 + (r.mult - 1) * t;
+    document.getElementById("crashMult").textContent = crashState.mult.toFixed(2) + "x";
+    const w = area.clientWidth - 60;
+    const hgt = area.clientHeight - 60;
+    rocket.style.left = (20 + w * t) + "px";
+    rocket.style.bottom = (20 + hgt * t) + "px";
+    if (t >= 1) {
+      clearInterval(crashState.timer);
+      crashCrash();
+    }
+  }, 50);
+}
+
+async function crashCashout() {
+  if (!crashState.active) return;
+  clearInterval(crashState.timer);
+  crashState.active = false;
+  const r = await api("/api/crash/cashout", {
+    method: "POST",
+    body: JSON.stringify({ user_id: USER_ID, bet: crashState.bet, cash_mult: crashState.mult, crash: crashState.crashAt })
+  });
+  if (r.error) return toast("Поздно!");
+  toast("+" + r.gain + " ⭐");
+  document.getElementById("crashBtn").textContent = "Старт";
+  document.getElementById("rocket").textContent = "🚀";
+  await loadUser();
+  loadCrashHistory();
+}
+
+async function crashCrash() {
+  crashState.active = false;
+  document.getElementById("rocket").textContent = "💥";
+  toast("💥 Краш на " + crashState.crashAt.toFixed(2) + "x — проигрыш");
+  document.getElementById("crashBtn").textContent = "Старт";
+  await loadUser();
+  loadCrashHistory();
+}
+
+// --------- CASES ---------
+function casesHTML() {
+  return `
+  <div class="screen">
+    <div class="back-btn" onclick="go('menu')">← Назад</div>
+    <h2>🎁 Кейсы</h2>
+    <div class="case-card" onclick="openCase('free')">
+      <h3>🆓 Бесплатный</h3>
+      <div class="price">Требуется подписка на @rud_game</div>
+    </div>
+    <div class="case-card" onclick="openCase('farm_nft')">
+      <h3>🖼 Фарм NFT</h3>
+      <div class="price">2 ⭐ · до 8 ⭐ + NFT</div>
+    </div>
+    <div class="case-card" onclick="openCase('last_chance')">
+      <h3>💎 Последний шанс</h3>
+      <div class="price">650 ⭐ · 300–500 ⭐ + NFT</div>
+    </div>
+  </div>`;
+}
+
+async function openCase(name) {
+  const r = await api("/api/case/open", {
+    method: "POST", body: JSON.stringify({ user_id: USER_ID, case: name })
+  });
+  if (r.error) return toast(r.error);
+  showReward(r);
+  await loadUser();
+}
+
+function showReward(r) {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `
+    <div class="modal-box">
+      <h3>🎉 Ты выиграл!</h3>
+      <div class="big-reward">+${r.reward} ⭐</div>
+      ${r.nft ? `<div style="color:#7dffb0;font-size:13px;margin-top:8px">+ NFT: <a href="${r.nft}" style="color:#7dffb0" target="_blank">открыть</a></div>` : ""}
+      <button class="main" style="margin-top:16px" onclick="this.closest('.modal').remove()">Забрать</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// --------- DEPOSIT ---------
+function openDeposit() {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `
+    <div class="modal-box">
+      <h3>⭐ Пополнение</h3>
+      <input type="number" id="depAmount" placeholder="Минимум 10 ⭐" min="10" style="margin-bottom:12px">
+      <button class="main" onclick="doDeposit(this)">Пополнить</button>
+      <button class="main" style="background:none;color:#7abf95;box-shadow:none;margin-top:8px" onclick="this.closest('.modal').remove()">Отмена</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function doDeposit(btn) {
+  const amount = parseInt(document.getElementById("depAmount").value);
+  if (!amount || amount < 10) return toast("Минимум 10 ⭐");
+  btn.disabled = true; btn.textContent = "Отправляю...";
+  const r = await api("/api/deposit", {
+    method: "POST", body: JSON.stringify({ user_id: USER_ID, amount })
+  });
+  btn.disabled = false; btn.textContent = "Пополнить";
+  if (r.error) return toast(r.error);
+  toast("Счёт отправлен в личку бота!");
+  setTimeout(() => {
+    document.querySelector(".modal")?.remove();
+    tg?.close();
+  }, 1500);
+}
+
+// --------- INIT ---------
+(async () => {
+  await loadUser();
+  render();
+  setInterval(loadUser, 5000);
+})();
+</script>
+</body>
+  </html>
